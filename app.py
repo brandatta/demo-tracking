@@ -1,4 +1,6 @@
 import re
+import base64
+from pathlib import Path
 import streamlit as st
 import mysql.connector
 from mysql.connector import Error
@@ -8,52 +10,83 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
-# Parche de estilos para que el título no se corte
-st.markdown("""
-<style>
-/* Más aire arriba para que no se corte el título */
-.block-container { 
-  padding-top: 1.6rem !important;   /* antes 0.75rem */
-  padding-bottom: 0.25rem !important;
-}
+# ---------- LOGO (sin secrets) ----------
+# Busca en raíz del repo y luego en /assets
+LOCAL_LOGO_CANDIDATES = [
+    "logo.png", "logo.svg", "logo.jpg", "logo.jpeg",             # raíz del repo
+    "assets/logo.png", "assets/logo.svg", "assets/logo.jpg", "assets/logo.jpeg",  # fallback
+]
+RAW_GITHUB_LOGO_URL = ""  # opcional, ej: "https://raw.githubusercontent.com/<user>/<repo>/<branch>/logo.png"
+LOGO_HEIGHT_PX = 28
 
-/* Evitar que los encabezados “choquen” con el borde superior */
-h1, h2, h3 {
+def data_uri_from_file(path: str) -> str | None:
+    p = Path(path)
+    if not p.exists():
+        return None
+    ext = p.suffix.lower()
+    mime = "image/png"
+    if ext == ".svg":
+        mime = "image/svg+xml"
+    elif ext in (".jpg", ".jpeg"):
+        mime = "image/jpeg"
+    data = base64.b64encode(p.read_bytes()).decode("utf-8")
+    return f"data:{mime};base64,{data}"
+
+def resolve_logo_src() -> str | None:
+    for candidate in LOCAL_LOGO_CANDIDATES:
+        src = data_uri_from_file(candidate)
+        if src:
+            return src
+    if RAW_GITHUB_LOGO_URL.strip():
+        return RAW_GITHUB_LOGO_URL.strip()
+    return None
+
+LOGO_SRC = resolve_logo_src()
+
+# ---- Estilos: título chico + logo arriba derecha + layout prolijo ----
+st.markdown(f"""
+<style>
+.block-container {{
+  padding-top: 1.2rem !important;
+  padding-bottom: 0.25rem !important;
+}}
+h1 {{
+  font-size: 1.15rem !important;
   margin-top: 0.2rem !important;
   margin-bottom: 0.6rem !important;
   line-height: 1.25 !important;
   white-space: normal !important;
   overflow-wrap: anywhere;
-}
+}}
+[data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
+[data-testid="stSidebar"] {{
+  min-width: 300px; width: 300px; border-right: 1px solid #eee;
+}}
+.info-card {{
+  border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
+  background: #fafafa; margin-top: 10px;
+}}
+.actions {{ text-align: right; margin-bottom: 6px; }}
+.actions a {{ text-decoration: none; }}
 
-/* Asegurar que nada oculte el overflow del primer bloque */
-[data-testid="stAppViewContainer"] > .main {
-  overflow: visible !important;
-}
-
-/* Sidebar prolija */
-[data-testid="stSidebar"] { 
-  min-width: 300px; 
-  width: 300px; 
-  border-right: 1px solid #eee; 
-}
-
-/* Tarjeta informativa */
-.info-card { 
-  border: 1px solid #e9e9e9; 
-  border-radius: 12px; 
-  padding: 10px 12px; 
-  background: #fafafa; 
-  margin-top: 10px; 
-}
-
-/* Acciones arriba del iframe */
-.actions { text-align: right; margin-bottom: 6px; }
-.actions a { text-decoration: none; }
+/* Logo fijo arriba a la derecha */
+.top-right-logo {{
+  position: fixed; top: 10px; right: 14px; z-index: 999;
+}}
+.top-right-logo img {{
+  height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-# ================== SECRETS / PARAMS ==================
+if LOGO_SRC:
+    # Hacelo clickeable cambiando href por tu sitio si querés
+    st.markdown(
+        f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
+        unsafe_allow_html=True
+    )
+
+# ================== SECRETS / PARAMS (DB) ==================
 DB = st.secrets["mysql"]
 SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
@@ -61,8 +94,9 @@ TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
 FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
-# ================== UTILS ==================
+# ================== UTILS (Drive + PDF) ==================
 def normalize_drive_url(url: str) -> str:
+    """Convierte links de Drive/Docs a URLs embebibles para iframe."""
     if not url:
         return url
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
@@ -80,6 +114,7 @@ def normalize_drive_url(url: str) -> str:
     return url
 
 def drive_download_url(url: str) -> str | None:
+    """Link de descarga directa para archivos de Drive."""
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
     m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
@@ -106,6 +141,7 @@ def get_connection():
 
 @st.cache_data(ttl=60)
 def load_nav_items():
+    """Devuelve [{'tag':..., 'url':...}] desde streamlit_apps.links_demos"""
     rows = []
     conn = cur = None
     try:
@@ -146,7 +182,7 @@ if open_mode == "Nueva pestaña":
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
 
-# Acciones (arriba del iframe)
+# Acciones (arriba del iframe): abrir/descargar PDF si aplica
 pdf_download = None
 if "drive.google.com" in selected["url"]:
     pdf_download = drive_download_url(selected["url"])
@@ -159,7 +195,7 @@ if pdf_download:
 actions += "</div>"
 st.markdown(actions, unsafe_allow_html=True)
 
-# Iframe
+# Iframe (con URL normalizada si es Drive/Docs)
 embed_url = normalize_drive_url(selected["url"])
 if open_mode == "iframe (panel principal)":
     try:
@@ -168,7 +204,7 @@ if open_mode == "iframe (panel principal)":
     except Exception:
         st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
 
-# Info card (DEBAJO del iframe)
+# Tarjeta de info (debajo del iframe)
 parsed = urlparse(selected["url"])
 host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
@@ -181,4 +217,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
