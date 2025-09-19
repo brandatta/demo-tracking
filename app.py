@@ -88,7 +88,7 @@ st.markdown(f"""
 <style>
 /* Más aire arriba para evitar recortes del header */
 .block-container {{
-  padding-top: 2.0rem !important;      /* antes 1.2rem */
+  padding-top: 2.0rem !important;
   padding-bottom: 0.25rem !important;
 }}
 [data-testid="stAppViewContainer"] > .main {{
@@ -117,12 +117,12 @@ h1 {{
 .actions {{ text-align: right; margin-bottom: 6px; }}
 .actions a {{ text-decoration: none; }}
 
-/* Logo flotante (fondo transparente) — más abajo y con z-index muy alto */
+/* Logo flotante (fondo transparente) — más abajo y más hacia la izquierda */
 .top-right-logo {{
   position: fixed;
-  top: 72px;                 /* antes 56px: lo bajamos para que no se corte */
-  right: 14px;
-  z-index: 2147483647;       /* súper por encima de todo */
+  top: 72px;                 /* altura: ajustá si hace falta */
+  right: 28px;               /* ← más a la izquierda (antes 14px) */
+  z-index: 2147483647;
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -272,4 +272,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
