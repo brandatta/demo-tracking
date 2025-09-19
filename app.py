@@ -10,17 +10,11 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
-# ---------- LOGO (archivo local en raíz o /assets, sin secrets) ----------
-LOCAL_LOGO_CANDIDATES = [
-    "logo.png", "logo.svg", "logo.jpg", "logo.jpeg",                # raíz del repo
-    "assets/logo.png", "assets/logo.svg", "assets/logo.jpg", "assets/logo.jpeg",  # fallback
-]
-RAW_GITHUB_LOGO_URL = ""  # opcional: raw URL de GitHub si querés forzar URL externa
+# ---------- LOGO: búsqueda robusta en varias carpetas ----------
 LOGO_HEIGHT_PX = 28
 
-def data_uri_from_file(path: str) -> str | None:
-    p = Path(path)
-    if not p.exists():
+def _read_file_as_data_uri(p: Path) -> str | None:
+    if not p.exists() or not p.is_file():
         return None
     ext = p.suffix.lower()
     mime = "image/png"
@@ -28,21 +22,69 @@ def data_uri_from_file(path: str) -> str | None:
         mime = "image/svg+xml"
     elif ext in (".jpg", ".jpeg"):
         mime = "image/jpeg"
-    data = base64.b64encode(p.read_bytes()).decode("utf-8")
-    return f"data:{mime};base64,{data}"
+    try:
+        data = base64.b64encode(p.read_bytes()).decode("utf-8")
+        return f"data:{mime};base64,{data}"
+    except Exception:
+        return None
 
-def resolve_logo_src() -> str | None:
-    # 1) archivo local (prioriza raíz del repo)
-    for candidate in LOCAL_LOGO_CANDIDATES:
-        src = data_uri_from_file(candidate)
-        if src:
-            return src
-    # 2) fallback: URL cruda de GitHub si la completaste arriba
-    if RAW_GITHUB_LOGO_URL.strip():
-        return RAW_GITHUB_LOGO_URL.strip()
-    return None
+def resolve_logo_src() -> tuple[str | None, list[str]]:
+    """
+    Devuelve (data_uri_o_url, rutas_encontradas) intentando:
+    1) Carpeta del script (__file__)
+    2) assets/ bajo esa carpeta
+    3) Carpeta padre (raíz del repo)
+    4) assets/ bajo carpeta padre
+    5) CWD (por si Streamlit cambia el working dir)
+    """
+    found = []
+    # 0) Dirs base
+    try:
+        script_dir = Path(__file__).parent.resolve()
+    except NameError:
+        script_dir = Path.cwd().resolve()
+    parent_dir = script_dir.parent
+    cwd_dir = Path.cwd().resolve()
 
-LOGO_SRC = resolve_logo_src()
+    # 1) Candidatos relativos a script_dir
+    candidates = [
+        script_dir / "logo.png",
+        script_dir / "logo.svg",
+        script_dir / "logo.jpg",
+        script_dir / "logo.jpeg",
+        script_dir / "assets" / "logo.png",
+        script_dir / "assets" / "logo.svg",
+        script_dir / "assets" / "logo.jpg",
+        script_dir / "assets" / "logo.jpeg",
+        # 2) Candidatos relativos a parent_dir (raíz del repo)
+        parent_dir / "logo.png",
+        parent_dir / "logo.svg",
+        parent_dir / "logo.jpg",
+        parent_dir / "logo.jpeg",
+        parent_dir / "assets" / "logo.png",
+        parent_dir / "assets" / "logo.svg",
+        parent_dir / "assets" / "logo.jpg",
+        parent_dir / "assets" / "logo.jpeg",
+        # 3) Candidatos relativos a cwd (por si cambia el working dir)
+        cwd_dir / "logo.png",
+        cwd_dir / "logo.svg",
+        cwd_dir / "logo.jpg",
+        cwd_dir / "logo.jpeg",
+        cwd_dir / "assets" / "logo.png",
+        cwd_dir / "assets" / "logo.svg",
+        cwd_dir / "assets" / "logo.jpg",
+        cwd_dir / "assets" / "logo.jpeg",
+    ]
+
+    for p in candidates:
+        if p.exists():
+            found.append(str(p))
+            src = _read_file_as_data_uri(p)
+            if src:
+                return src, found
+    return None, found
+
+LOGO_SRC, LOGO_FOUND_PATHS = resolve_logo_src()
 
 # ---- Estilos: título chico + logo arriba derecha + layout prolijo ----
 st.markdown(f"""
@@ -86,6 +128,11 @@ if LOGO_SRC:
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
         unsafe_allow_html=True
     )
+
+# ===== Debug rápido para verificar dónde busca el logo =====
+with st.sidebar.expander("Debug logo"):
+    st.write("Rutas donde se encontró un candidato:", LOGO_FOUND_PATHS or "(ninguna)")
+    st.write("¿Logo resuelto?:", "sí" if LOGO_SRC else "no")
 
 # ================== SECRETS / PARAMS (DB) ==================
 DB = st.secrets["mysql"]  # credenciales
