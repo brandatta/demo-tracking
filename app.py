@@ -10,13 +10,12 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
-# ---------- LOGO (sin secrets) ----------
-# Busca en raíz del repo y luego en /assets
+# ---------- LOGO (archivo local en raíz o /assets, sin secrets) ----------
 LOCAL_LOGO_CANDIDATES = [
-    "logo.png", "logo.svg", "logo.jpg", "logo.jpeg",             # raíz del repo
+    "logo.png", "logo.svg", "logo.jpg", "logo.jpeg",                # raíz del repo
     "assets/logo.png", "assets/logo.svg", "assets/logo.jpg", "assets/logo.jpeg",  # fallback
 ]
-RAW_GITHUB_LOGO_URL = ""  # opcional, ej: "https://raw.githubusercontent.com/<user>/<repo>/<branch>/logo.png"
+RAW_GITHUB_LOGO_URL = ""  # opcional: raw URL de GitHub si querés forzar URL externa
 LOGO_HEIGHT_PX = 28
 
 def data_uri_from_file(path: str) -> str | None:
@@ -33,10 +32,12 @@ def data_uri_from_file(path: str) -> str | None:
     return f"data:{mime};base64,{data}"
 
 def resolve_logo_src() -> str | None:
+    # 1) archivo local (prioriza raíz del repo)
     for candidate in LOCAL_LOGO_CANDIDATES:
         src = data_uri_from_file(candidate)
         if src:
             return src
+    # 2) fallback: URL cruda de GitHub si la completaste arriba
     if RAW_GITHUB_LOGO_URL.strip():
         return RAW_GITHUB_LOGO_URL.strip()
     return None
@@ -69,9 +70,9 @@ h1 {{
 .actions {{ text-align: right; margin-bottom: 6px; }}
 .actions a {{ text-decoration: none; }}
 
-/* Logo fijo arriba a la derecha */
+/* Logo fijo arriba a la derecha (z-index alto por si el header tapa) */
 .top-right-logo {{
-  position: fixed; top: 10px; right: 14px; z-index: 999;
+  position: fixed; top: 10px; right: 14px; z-index: 99999;
 }}
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
@@ -79,15 +80,15 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
+# Render del logo (clickeable si querés: cambiá href='#' por tu sitio)
 if LOGO_SRC:
-    # Hacelo clickeable cambiando href por tu sitio si querés
     st.markdown(
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
         unsafe_allow_html=True
     )
 
 # ================== SECRETS / PARAMS (DB) ==================
-DB = st.secrets["mysql"]
+DB = st.secrets["mysql"]  # credenciales
 SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
@@ -114,7 +115,7 @@ def normalize_drive_url(url: str) -> str:
     return url
 
 def drive_download_url(url: str) -> str | None:
-    """Link de descarga directa para archivos de Drive."""
+    """Genera link de descarga directa para archivos de Drive."""
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
     m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
@@ -182,7 +183,7 @@ if open_mode == "Nueva pestaña":
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
 
-# Acciones (arriba del iframe): abrir/descargar PDF si aplica
+# Acciones (arriba del iframe): abrir / descargar si es PDF
 pdf_download = None
 if "drive.google.com" in selected["url"]:
     pdf_download = drive_download_url(selected["url"])
