@@ -1,3 +1,4 @@
+import re
 import streamlit as st
 import mysql.connector
 from mysql.connector import Error
@@ -15,16 +16,82 @@ h1, h2, h3 { margin-bottom: 0.35rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================== SECRETS ==================
+# ================== SECRETS / PARAMS ==================
 DB = st.secrets["mysql"]
 
-# Permite override desde secrets si querés cambiar nombres sin tocar el código
-SCHEMA = st.secrets.get("schema", "streamlit_apps")
-TABLE  = st.secrets.get("table", "links_demos")
+# FQN (schema/tabla/columnas) — ya con tus nombres
+SCHEMA  = st.secrets.get("schema", "streamlit_apps")
+TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
+FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
-FQN = f"`{SCHEMA}`.`{TABLE}`"  # fully qualified name schema.tabla
+# ================== UTILS ==================
+def normalize_drive_url(url: str) -> str:
+    """
+    Convierte links de Google Drive/Docs en URLs embebibles para iframe.
+    - drive: .../file/d/ID/view|preview|... -> /file/d/ID/preview
+    - drive: open?id=ID -> /file/d/ID/preview
+    - drive: uc?export=download&id=ID -> /file/d/ID/preview
+    - docs:  document/d/ID/... -> /document/d/ID/pub?embedded=true
+    - sheets: spreadsheets/d/ID/... -> /spreadsheets/d/ID/pubhtml?widget=true&headers=false
+    - slides: presentation/d/ID/... -> /presentation/d/ID/embed?start=false&loop=false
+    """
+    if not url:
+        return url
+
+    # FILE (Drive)
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
+    if m:
+        return f"https://drive.google.com/file/d/{m.group(1)}/preview"
+
+    # OPEN (Drive)
+    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
+    if m:
+        return f"https://drive.google.com/file/d/{m.group(1)}/preview"
+
+    # UC (Drive)
+    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    if m:
+        return f"https://drive.google.com/file/d/{m.group(1)}/preview"
+
+    # Google Docs
+    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
+    if m:
+        return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
+
+    # Google Sheets
+    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
+    if m:
+        return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
+
+    # Google Slides
+    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
+    if m:
+        return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
+
+    return url
+
+def drive_download_url(url: str) -> str | None:
+    """Genera link de descarga directa de Drive si corresponde."""
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    return None
+
+def is_pdf_url(url: str) -> bool:
+    """Heurística: True si parece PDF (Drive o .pdf)."""
+    if not url:
+        return False
+    if "drive.google.com" in url:
+        return True
+    return url.lower().split("?")[0].endswith(".pdf")
 
 # ================== DB ==================
 def get_connection():
@@ -32,7 +99,7 @@ def get_connection():
         host=DB["host"],
         user=DB["user"],
         password=DB["password"],
-        database=DB.get("database", SCHEMA),  # por si tu usuario requiere seleccionar DB
+        database=DB.get("database", SCHEMA),  # por si el usuario necesita seleccionar DB
         port=DB.get("port", 3306),
         autocommit=True,
     )
@@ -41,8 +108,7 @@ def get_connection():
 def load_nav_items():
     """Devuelve [{'tag':..., 'url':...}] desde streamlit_apps.links_demos"""
     rows = []
-    conn = None
-    cur = None
+    conn = cur = None
     try:
         conn = get_connection()
         cur = conn.cursor()
@@ -61,6 +127,7 @@ def load_nav_items():
             pass
     return rows
 
+# ================== DATA ==================
 items = load_nav_items()
 
 # ================== SIDEBAR ==================
@@ -69,8 +136,7 @@ if not items:
     st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
     st.stop()
 
-height = st.sidebar.slider("Altura del iframe (px)", 500, 1400, 850, 50)
-
+height = st.sidebar.slider("Altura del iframe (px)", 500, 1600, 900, 50)
 choices = [i["tag"] for i in items]
 choice = st.sidebar.selectbox("Enlaces disponibles", choices, index=0)
 selected = next(i for i in items if i["tag"] == choice)
@@ -84,11 +150,25 @@ if open_mode == "Nueva pestaña":
 
 # ================== MAIN ==================
 st.markdown("### 🎯 Demo de Producto — Tracking")
-st.markdown(
-    f"<div style='text-align:right'><a href='{custom_url}' target='_blank'>🔗 Abrir en nueva pestaña</a></div>",
-    unsafe_allow_html=True
-)
 
+# Preparar URLs para acciones y embed
+embed_url = normalize_drive_url(custom_url)
+pdf_download = None
+if "drive.google.com" in custom_url:
+    pdf_download = drive_download_url(custom_url)
+elif is_pdf_url(custom_url):
+    pdf_download = custom_url
+
+# Barra de acciones (abrir / descargar)
+actions_html = "<div style='text-align:right'>"
+actions_html += f"<a href='{custom_url}' target='_blank'>🔗 Abrir en nueva pestaña</a>"
+if pdf_download:
+    # Nota: el atributo 'download' puede ser ignorado en cross-origin; igual sirve como enlace directo.
+    actions_html += f" &nbsp;&nbsp;|&nbsp;&nbsp; <a href='{pdf_download}' download>⬇️ Descargar PDF</a>"
+actions_html += "</div>"
+st.markdown(actions_html, unsafe_allow_html=True)
+
+# Tarjeta informativa
 parsed = urlparse(custom_url)
 host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
@@ -102,9 +182,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
+# Render del iframe con la URL embebible
 if open_mode == "iframe (panel principal)":
     try:
-        iframe(src=custom_url, height=height, scrolling=True)
+        iframe(src=embed_url, height=height, scrolling=True)
         st.caption("Si no se ve, el sitio puede bloquear el embebido (X-Frame-Options/CSP).")
     except Exception:
         st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
