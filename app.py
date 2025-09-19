@@ -11,7 +11,8 @@ from streamlit.components.v1 import iframe
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
 # ---------- LOGO: búsqueda robusta en varias carpetas ----------
-LOGO_HEIGHT_PX = 28
+# Ajustá el tamaño acá (ej. 40, 48, 56)
+LOGO_HEIGHT_PX = 48
 
 def _read_file_as_data_uri(p: Path) -> str | None:
     if not p.exists() or not p.is_file():
@@ -82,7 +83,7 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos: título chico + logo arriba derecha (opción B) + layout prolijo ----
+# ---- Estilos: título chico + logo flotante transparente + layout prolijo ----
 st.markdown(f"""
 <style>
 .block-container {{
@@ -108,16 +109,16 @@ h1 {{
 .actions {{ text-align: right; margin-bottom: 6px; }}
 .actions a {{ text-decoration: none; }}
 
-/* Logo fijo arriba a la derecha, más abajo y con fondo (OPCIÓN B) */
+/* Logo flotante (fondo transparente, sin caja/sombra) */
 .top-right-logo {{
   position: fixed;
-  top: 56px;             /* bajado para no chocar con el header */
+  top: 56px;             /* ajustá si lo querés más arriba/abajo */
   right: 14px;
   z-index: 99999;
-  background: rgba(255,255,255,0.6);  /* fondo para contraste */
-  border-radius: 6px;
-  padding: 4px 6px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
 }}
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
@@ -125,7 +126,7 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
-# Render del logo (clickeable si querés: cambiá href='#' por tu sitio)
+# Render del logo (cambiá href='#' por tu sitio si querés que sea clickeable)
 if LOGO_SRC:
     st.markdown(
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
@@ -145,27 +146,27 @@ def normalize_drive_url(url: str) -> str:
     """Convierte links de Drive/Docs a URLs embebibles para iframe."""
     if not url:
         return url
-    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
+    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
 def drive_download_url(url: str) -> str | None:
     """Genera link de descarga directa para archivos de Drive."""
-    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
+    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
-    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
-    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
     return None
 
