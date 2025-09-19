@@ -11,7 +11,7 @@ from streamlit.components.v1 import iframe
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
 # ---------- LOGO: búsqueda robusta en varias carpetas ----------
-LOGO_HEIGHT_PX = 48  # podés ajustar el tamaño del logo
+LOGO_HEIGHT_PX = 48  # tamaño del logo
 
 def _read_file_as_data_uri(p: Path) -> str | None:
     if not p.exists() or not p.is_file():
@@ -38,30 +38,18 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
     cwd_dir = Path.cwd().resolve()
 
     candidates = [
-        script_dir / "logo.png",
-        script_dir / "logo.svg",
-        script_dir / "logo.jpg",
-        script_dir / "logo.jpeg",
-        script_dir / "assets" / "logo.png",
-        script_dir / "assets" / "logo.svg",
-        script_dir / "assets" / "logo.jpg",
-        script_dir / "assets" / "logo.jpeg",
-        parent_dir / "logo.png",
-        parent_dir / "logo.svg",
-        parent_dir / "logo.jpg",
-        parent_dir / "logo.jpeg",
-        parent_dir / "assets" / "logo.png",
-        parent_dir / "assets" / "logo.svg",
-        parent_dir / "assets" / "logo.jpg",
-        parent_dir / "assets" / "logo.jpeg",
-        cwd_dir / "logo.png",
-        cwd_dir / "logo.svg",
-        cwd_dir / "logo.jpg",
-        cwd_dir / "logo.jpeg",
-        cwd_dir / "assets" / "logo.png",
-        cwd_dir / "assets" / "logo.svg",
-        cwd_dir / "assets" / "logo.jpg",
-        cwd_dir / "assets" / "logo.jpeg",
+        script_dir / "logo.png", script_dir / "logo.svg",
+        script_dir / "logo.jpg", script_dir / "logo.jpeg",
+        script_dir / "assets" / "logo.png", script_dir / "assets" / "logo.svg",
+        script_dir / "assets" / "logo.jpg", script_dir / "assets" / "logo.jpeg",
+        parent_dir / "logo.png", parent_dir / "logo.svg",
+        parent_dir / "logo.jpg", parent_dir / "logo.jpeg",
+        parent_dir / "assets" / "logo.png", parent_dir / "assets" / "logo.svg",
+        parent_dir / "assets" / "logo.jpg", parent_dir / "assets" / "logo.jpeg",
+        cwd_dir / "logo.png", cwd_dir / "logo.svg",
+        cwd_dir / "logo.jpg", cwd_dir / "logo.jpeg",
+        cwd_dir / "assets" / "logo.png", cwd_dir / "assets" / "logo.svg",
+        cwd_dir / "assets" / "logo.jpg", cwd_dir / "assets" / "logo.jpeg",
     ]
 
     for p in candidates:
@@ -105,12 +93,11 @@ h1 {{
   border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
   background: #fafafa; margin-top: 10px;
 }}
-/* SIN barra de acciones */
 
 /* Logo flotante (fondo transparente) — más abajo y más hacia la izquierda */
 .top-right-logo {{
   position: fixed;
-  top: 72px;                 /* altura: ajustá si hace falta */
+  top: 72px;
   right: 28px;               /* más a la izquierda */
   z-index: 2147483647;
   background: transparent;
@@ -158,8 +145,8 @@ def normalize_drive_url(url: str) -> str:
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
-# (lo dejamos disponible por si lo querés reusar más adelante)
 def drive_download_url(url: str) -> str | None:
+    """Genera link de descarga directa para archivos de Drive."""
     m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
     m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
@@ -221,6 +208,16 @@ selected = next(i for i in items if i["tag"] == choice)
 
 # Link para abrir en nueva pestaña (solo en el navegador)
 st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
+
+# Link de descarga de PDF (si aplica)
+pdf_download = None
+if "drive.google.com" in selected["url"]:
+    pdf_download = drive_download_url(selected["url"])
+elif is_pdf_url(selected["url"]):
+    pdf_download = selected["url"]
+
+if pdf_download:
+    st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
 
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
