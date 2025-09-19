@@ -10,7 +10,7 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
-# ---------- LOGO: búsqueda robusta en varias carpetas ----------
+# ---------- LOGO ----------
 LOGO_HEIGHT_PX = 48  # tamaño del logo
 
 def _read_file_as_data_uri(p: Path) -> str | None:
@@ -38,20 +38,16 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
     cwd_dir = Path.cwd().resolve()
 
     candidates = [
-        script_dir / "logo.png", script_dir / "logo.svg",
-        script_dir / "logo.jpg", script_dir / "logo.jpeg",
+        script_dir / "logo.png", script_dir / "logo.svg", script_dir / "logo.jpg", script_dir / "logo.jpeg",
         script_dir / "assets" / "logo.png", script_dir / "assets" / "logo.svg",
         script_dir / "assets" / "logo.jpg", script_dir / "assets" / "logo.jpeg",
-        parent_dir / "logo.png", parent_dir / "logo.svg",
-        parent_dir / "logo.jpg", parent_dir / "logo.jpeg",
+        parent_dir / "logo.png", parent_dir / "logo.svg", parent_dir / "logo.jpg", parent_dir / "logo.jpeg",
         parent_dir / "assets" / "logo.png", parent_dir / "assets" / "logo.svg",
         parent_dir / "assets" / "logo.jpg", parent_dir / "assets" / "logo.jpeg",
-        cwd_dir / "logo.png", cwd_dir / "logo.svg",
-        cwd_dir / "logo.jpg", cwd_dir / "logo.jpeg",
+        cwd_dir / "logo.png", cwd_dir / "logo.svg", cwd_dir / "logo.jpg", cwd_dir / "logo.jpeg",
         cwd_dir / "assets" / "logo.png", cwd_dir / "assets" / "logo.svg",
         cwd_dir / "assets" / "logo.jpg", cwd_dir / "assets" / "logo.jpeg",
     ]
-
     for p in candidates:
         if p.exists():
             found.append(str(p))
@@ -62,21 +58,15 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos: título chico + logo flotante transparente + layout prolijo ----
+# ---- Estilos ----
 st.markdown(f"""
 <style>
-/* Más aire arriba para evitar recortes del header */
 .block-container {{
   padding-top: 2.0rem !important;
   padding-bottom: 0.25rem !important;
 }}
-[data-testid="stAppViewContainer"] > .main {{
-  overflow: visible !important;
-}}
-header, [data-testid="stHeader"] {{
-  height: auto !important;
-  overflow: visible !important;
-}}
+[data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
+header, [data-testid="stHeader"] {{ height: auto !important; overflow: visible !important; }}
 
 h1 {{
   font-size: 1.15rem !important;
@@ -94,16 +84,14 @@ h1 {{
   background: #fafafa; margin-top: 10px;
 }}
 
-/* Logo flotante (fondo transparente) — más abajo y más hacia la izquierda */
+/* Logo flotante transparente */
 .top-right-logo {{
   position: fixed;
   top: 72px;
-  right: 28px;               /* más a la izquierda */
+  right: 28px;  /* un poco más hacia la izquierda */
   z-index: 2147483647;
   background: transparent;
-  padding: 0;
-  border-radius: 0;
-  box-shadow: none;
+  padding: 0; border-radius: 0; box-shadow: none;
 }}
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
@@ -111,7 +99,6 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
-# Render del logo (cambiá href='#' por tu sitio si querés que sea clickeable)
 if LOGO_SRC:
     st.markdown(
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
@@ -119,46 +106,70 @@ if LOGO_SRC:
     )
 
 # ================== SECRETS / PARAMS (DB) ==================
-DB = st.secrets["mysql"]  # credenciales
+DB = st.secrets["mysql"]
 SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
 FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
-# ================== UTILS (Drive + PDF) ==================
+# ================== UTILS (Drive + Docs/Sheets/Slides + PDF) ==================
 def normalize_drive_url(url: str) -> str:
     """Convierte links de Drive/Docs a URLs embebibles para iframe."""
     if not url:
         return url
-    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
+    # Drive file
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
+    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
+    # Docs
+    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
+    # Sheets
+    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
+    # Slides
+    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
-def drive_download_url(url: str) -> str | None:
-    """Genera link de descarga directa para archivos de Drive."""
-    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
-    if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
-    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
-    if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
-    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
-    if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+def build_pdf_download_url(url: str) -> str | None:
+    """Devuelve una URL para descargar PDF si es posible (Drive file, Docs, Sheets, Slides o .pdf)."""
+    if not url:
+        return None
+    # PDF directo
+    if url.lower().split("?")[0].endswith(".pdf"):
+        return url
+    # Drive file -> descarga directa
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
+        re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
+        re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    if m:
+        file_id = m.group(1)
+        return f"https://drive.google.com/uc?export=download&id={file_id}"
+    # Google Docs -> export a PDF
+    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
+    if m:
+        doc_id = m.group(1)
+        return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
+    # Google Sheets -> export a PDF (con params básicos)
+    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
+    if m:
+        sheet_id = m.group(1)
+        # Ajustes: una sola hoja, orientación, tamaño… (valores por defecto razonables)
+        return (
+            "https://docs.google.com/spreadsheets/d/"
+            f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false"
+        )
+    # Google Slides -> export a PDF
+    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
+    if m:
+        pres_id = m.group(1)
+        return f"https://docs.google.com/presentation/d/{pres_id}/export/pdf"
     return None
-
-def is_pdf_url(url: str) -> bool:
-    if not url: return False
-    if "drive.google.com" in url: return True
-    return url.lower().split("?")[0].endswith(".pdf")
 
 # ================== DB ==================
 def get_connection():
@@ -173,7 +184,6 @@ def get_connection():
 
 @st.cache_data(ttl=60)
 def load_nav_items():
-    """Devuelve [{'tag':..., 'url':...}] desde streamlit_apps.links_demos"""
     rows = []
     conn = cur = None
     try:
@@ -206,26 +216,20 @@ choices = [i["tag"] for i in items]
 choice = st.sidebar.selectbox("Enlaces", choices, index=0)
 selected = next(i for i in items if i["tag"] == choice)
 
-# Link para abrir en nueva pestaña (solo en el navegador)
+# Acciones en el navegador
 st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
 
-# Link de descarga de PDF (si aplica)
-pdf_download = None
-if "drive.google.com" in selected["url"]:
-    pdf_download = drive_download_url(selected["url"])
-elif is_pdf_url(selected["url"]):
-    pdf_download = selected["url"]
-
+pdf_download = build_pdf_download_url(selected["url"])
 if pdf_download:
     st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
 
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
 
-# Iframe fijo a 900 px (sin barra de acciones arriba)
+# Iframe fijo a 900 px
 embed_url = normalize_drive_url(selected["url"])
 try:
-    iframe(src=embed_url, height=900, scrolling=True)  # altura fija a 900 px
+    iframe(src=embed_url, height=900, scrolling=True)
     st.caption("Si no se ve, el sitio puede bloquear el embebido (X-Frame-Options/CSP).")
 except Exception:
     st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
