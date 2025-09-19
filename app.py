@@ -30,13 +30,13 @@ h1, h2, h3 { margin-bottom: 0.35rem !important; }
 """, unsafe_allow_html=True)
 
 # ================== DATOS ==================
-DEFAULT_URL = "https://tracking.demobrandatta.net"
+DEFAULT_URL = "https://lookerstudio.google.com/reporting/1wL0OBhOAbBG8KYjJF7_V5psEHCS604dD"
 
 # 1) Sitios web (para iframe o nueva pestaña)
 SITES = {
     "App de Tracking (Georgalos)": DEFAULT_URL,
     "Página principal Brandatta": "https://www.brandatta.com.ar",
-    "Demo pública de seguimiento": "https://tracking.demobrandatta.net",
+    "Demo pública de seguimiento": "https://lookerstudio.google.com/reporting/1wL0OBhOAbBG8KYjJF7_V5psEHCS604dD",
 }
 
 # 2) PDFs (reemplazá las URLs por las tuyas)
