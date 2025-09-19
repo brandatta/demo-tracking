@@ -30,7 +30,7 @@ h1, h2, h3 { margin-bottom: 0.35rem !important; }
 """, unsafe_allow_html=True)
 
 # ================== DATOS ==================
-DEFAULT_URL = "https://tracking.georgalosproduccion.com"
+DEFAULT_URL = "https://tracking.demobrandatta.net"
 
 # 1) Sitios web (para iframe o nueva pestaña)
 SITES = {
