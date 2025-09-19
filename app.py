@@ -86,10 +86,19 @@ LOGO_SRC, _ = resolve_logo_src()
 # ---- Estilos: título chico + logo flotante transparente + layout prolijo ----
 st.markdown(f"""
 <style>
+/* Más aire arriba para evitar recortes del header */
 .block-container {{
-  padding-top: 1.2rem !important;
+  padding-top: 2.0rem !important;      /* antes 1.2rem */
   padding-bottom: 0.25rem !important;
 }}
+[data-testid="stAppViewContainer"] > .main {{
+  overflow: visible !important;
+}}
+header, [data-testid="stHeader"] {{
+  height: auto !important;
+  overflow: visible !important;
+}}
+
 h1 {{
   font-size: 1.15rem !important;
   margin-top: 0.2rem !important;
@@ -98,7 +107,6 @@ h1 {{
   white-space: normal !important;
   overflow-wrap: anywhere;
 }}
-[data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
 [data-testid="stSidebar"] {{
   min-width: 300px; width: 300px; border-right: 1px solid #eee;
 }}
@@ -109,12 +117,12 @@ h1 {{
 .actions {{ text-align: right; margin-bottom: 6px; }}
 .actions a {{ text-decoration: none; }}
 
-/* Logo flotante (fondo transparente, sin caja/sombra) */
+/* Logo flotante (fondo transparente) — más abajo y con z-index muy alto */
 .top-right-logo {{
   position: fixed;
-  top: 56px;             /* ajustá si lo querés más arriba/abajo */
+  top: 72px;                 /* antes 56px: lo bajamos para que no se corte */
   right: 14px;
-  z-index: 99999;
+  z-index: 2147483647;       /* súper por encima de todo */
   background: transparent;
   padding: 0;
   border-radius: 0;
@@ -264,3 +272,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
