@@ -7,12 +7,47 @@ from streamlit.components.v1 import iframe
 
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
+
+# Parche de estilos para que el título no se corte
 st.markdown("""
 <style>
-.block-container { padding-top: 0.75rem; padding-bottom: 0.25rem; }
-[data-testid="stSidebar"] { min-width: 300px; width: 300px; border-right: 1px solid #eee; }
-h1, h2, h3 { margin-bottom: 0.35rem !important; }
-.info-card { border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px; background: #fafafa; margin-top: 10px; }
+/* Más aire arriba para que no se corte el título */
+.block-container { 
+  padding-top: 1.6rem !important;   /* antes 0.75rem */
+  padding-bottom: 0.25rem !important;
+}
+
+/* Evitar que los encabezados “choquen” con el borde superior */
+h1, h2, h3 {
+  margin-top: 0.2rem !important;
+  margin-bottom: 0.6rem !important;
+  line-height: 1.25 !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+/* Asegurar que nada oculte el overflow del primer bloque */
+[data-testid="stAppViewContainer"] > .main {
+  overflow: visible !important;
+}
+
+/* Sidebar prolija */
+[data-testid="stSidebar"] { 
+  min-width: 300px; 
+  width: 300px; 
+  border-right: 1px solid #eee; 
+}
+
+/* Tarjeta informativa */
+.info-card { 
+  border: 1px solid #e9e9e9; 
+  border-radius: 12px; 
+  padding: 10px 12px; 
+  background: #fafafa; 
+  margin-top: 10px; 
+}
+
+/* Acciones arriba del iframe */
 .actions { text-align: right; margin-bottom: 6px; }
 .actions a { text-decoration: none; }
 </style>
@@ -105,12 +140,11 @@ choice = st.sidebar.selectbox("Enlaces", choices, index=0)
 selected = next(i for i in items if i["tag"] == choice)
 
 open_mode = st.sidebar.radio("Abrir enlace en", ["iframe (panel principal)", "Nueva pestaña"], index=0)
-
 if open_mode == "Nueva pestaña":
     st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
 
 # ================== MAIN ==================
-st.markdown("### Demo de Producto — Tracking")
+st.title("Demo de Producto — Tracking")
 
 # Acciones (arriba del iframe)
 pdf_download = None
@@ -134,7 +168,7 @@ if open_mode == "iframe (panel principal)":
     except Exception:
         st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
 
-# Info card (ahora DEBAJO del iframe)
+# Info card (DEBAJO del iframe)
 parsed = urlparse(selected["url"])
 host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
@@ -147,3 +181,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
