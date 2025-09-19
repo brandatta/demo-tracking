@@ -11,8 +11,7 @@ from streamlit.components.v1 import iframe
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
 # ---------- LOGO: búsqueda robusta en varias carpetas ----------
-# Ajustá el tamaño acá (ej. 40, 48, 56)
-LOGO_HEIGHT_PX = 48
+LOGO_HEIGHT_PX = 48  # podés ajustar el tamaño del logo
 
 def _read_file_as_data_uri(p: Path) -> str | None:
     if not p.exists() or not p.is_file():
@@ -30,14 +29,6 @@ def _read_file_as_data_uri(p: Path) -> str | None:
         return None
 
 def resolve_logo_src() -> tuple[str | None, list[str]]:
-    """
-    Devuelve (data_uri_o_url, rutas_encontradas) intentando:
-    1) Carpeta del script (__file__)
-    2) assets/ bajo esa carpeta
-    3) Carpeta padre (raíz del repo)
-    4) assets/ bajo carpeta padre
-    5) CWD (por si Streamlit cambia el working dir)
-    """
     found = []
     try:
         script_dir = Path(__file__).parent.resolve()
@@ -114,14 +105,13 @@ h1 {{
   border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
   background: #fafafa; margin-top: 10px;
 }}
-.actions {{ text-align: right; margin-bottom: 6px; }}
-.actions a {{ text-decoration: none; }}
+/* SIN barra de acciones */
 
 /* Logo flotante (fondo transparente) — más abajo y más hacia la izquierda */
 .top-right-logo {{
   position: fixed;
   top: 72px;                 /* altura: ajustá si hace falta */
-  right: 28px;               /* ← más a la izquierda (antes 14px) */
+  right: 28px;               /* más a la izquierda */
   z-index: 2147483647;
   background: transparent;
   padding: 0;
@@ -168,8 +158,8 @@ def normalize_drive_url(url: str) -> str:
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
+# (lo dejamos disponible por si lo querés reusar más adelante)
 def drive_download_url(url: str) -> str | None:
-    """Genera link de descarga directa para archivos de Drive."""
     m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
     m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
@@ -225,39 +215,23 @@ if not items:
     st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
     st.stop()
 
-height = st.sidebar.slider("Altura del iframe (px)", 500, 1600, 900, 50)
 choices = [i["tag"] for i in items]
 choice = st.sidebar.selectbox("Enlaces", choices, index=0)
 selected = next(i for i in items if i["tag"] == choice)
 
-open_mode = st.sidebar.radio("Abrir enlace en", ["iframe (panel principal)", "Nueva pestaña"], index=0)
-if open_mode == "Nueva pestaña":
-    st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
+# Link para abrir en nueva pestaña (solo en el navegador)
+st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
 
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
 
-# Acciones (arriba del iframe): abrir / descargar si es PDF
-pdf_download = None
-if "drive.google.com" in selected["url"]:
-    pdf_download = drive_download_url(selected["url"])
-elif is_pdf_url(selected["url"]):
-    pdf_download = selected["url"]
-
-actions = f"<div class='actions'><a href='{selected['url']}' target='_blank'>Abrir en nueva pestaña</a>"
-if pdf_download:
-    actions += f" &nbsp;&nbsp;|&nbsp;&nbsp; <a href='{pdf_download}' download>Descargar PDF</a>"
-actions += "</div>"
-st.markdown(actions, unsafe_allow_html=True)
-
-# Iframe (con URL normalizada si es Drive/Docs)
+# Iframe fijo a 900 px (sin barra de acciones arriba)
 embed_url = normalize_drive_url(selected["url"])
-if open_mode == "iframe (panel principal)":
-    try:
-        iframe(src=embed_url, height=height, scrolling=True)
-        st.caption("Si no se ve, el sitio puede bloquear el embebido (X-Frame-Options/CSP).")
-    except Exception:
-        st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
+try:
+    iframe(src=embed_url, height=900, scrolling=True)  # altura fija a 900 px
+    st.caption("Si no se ve, el sitio puede bloquear el embebido (X-Frame-Options/CSP).")
+except Exception:
+    st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
 
 # Tarjeta de info (debajo del iframe)
 parsed = urlparse(selected["url"])
