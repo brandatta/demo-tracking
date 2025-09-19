@@ -38,7 +38,6 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
     5) CWD (por si Streamlit cambia el working dir)
     """
     found = []
-    # 0) Dirs base
     try:
         script_dir = Path(__file__).parent.resolve()
     except NameError:
@@ -46,7 +45,6 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
     parent_dir = script_dir.parent
     cwd_dir = Path.cwd().resolve()
 
-    # 1) Candidatos relativos a script_dir
     candidates = [
         script_dir / "logo.png",
         script_dir / "logo.svg",
@@ -56,7 +54,6 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
         script_dir / "assets" / "logo.svg",
         script_dir / "assets" / "logo.jpg",
         script_dir / "assets" / "logo.jpeg",
-        # 2) Candidatos relativos a parent_dir (raíz del repo)
         parent_dir / "logo.png",
         parent_dir / "logo.svg",
         parent_dir / "logo.jpg",
@@ -65,7 +62,6 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
         parent_dir / "assets" / "logo.svg",
         parent_dir / "assets" / "logo.jpg",
         parent_dir / "assets" / "logo.jpeg",
-        # 3) Candidatos relativos a cwd (por si cambia el working dir)
         cwd_dir / "logo.png",
         cwd_dir / "logo.svg",
         cwd_dir / "logo.jpg",
@@ -84,9 +80,9 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
                 return src, found
     return None, found
 
-LOGO_SRC, LOGO_FOUND_PATHS = resolve_logo_src()
+LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos: título chico + logo arriba derecha + layout prolijo ----
+# ---- Estilos: título chico + logo arriba derecha (opción B) + layout prolijo ----
 st.markdown(f"""
 <style>
 .block-container {{
@@ -112,9 +108,16 @@ h1 {{
 .actions {{ text-align: right; margin-bottom: 6px; }}
 .actions a {{ text-decoration: none; }}
 
-/* Logo fijo arriba a la derecha (z-index alto por si el header tapa) */
+/* Logo fijo arriba a la derecha, más abajo y con fondo (OPCIÓN B) */
 .top-right-logo {{
-  position: fixed; top: 10px; right: 14px; z-index: 99999;
+  position: fixed;
+  top: 56px;             /* bajado para no chocar con el header */
+  right: 14px;
+  z-index: 99999;
+  background: rgba(255,255,255,0.6);  /* fondo para contraste */
+  border-radius: 6px;
+  padding: 4px 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
 }}
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
@@ -128,11 +131,6 @@ if LOGO_SRC:
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
         unsafe_allow_html=True
     )
-
-# ===== Debug rápido para verificar dónde busca el logo =====
-with st.sidebar.expander("Debug logo"):
-    st.write("Rutas donde se encontró un candidato:", LOGO_FOUND_PATHS or "(ninguna)")
-    st.write("¿Logo resuelto?:", "sí" if LOGO_SRC else "no")
 
 # ================== SECRETS / PARAMS (DB) ==================
 DB = st.secrets["mysql"]  # credenciales
