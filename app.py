@@ -62,11 +62,11 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos base ----
+# ---- Estilos base (margen superior reducido) ----
 st.markdown(f"""
 <style>
 .block-container {{
-  padding-top: 2.0rem !important;
+  padding-top: 0.8rem !important;   /* antes 2.0rem */
   padding-bottom: 0.25rem !important;
 }}
 [data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
@@ -74,7 +74,7 @@ header, [data-testid="stHeader"] {{ height: auto !important; overflow: visible !
 
 h1 {{
   font-size: 1.15rem !important;
-  margin-top: 0.2rem !important;
+  margin-top: 0rem !important;      /* antes 0.2rem */
   margin-bottom: 0.6rem !important;
   line-height: 1.25 !important;
   white-space: normal !important;
@@ -91,7 +91,7 @@ h1 {{
 /* Logo flotante transparente */
 .top-right-logo {{
   position: fixed;
-  top: 72px;
+  top: 64px;              /* antes 72px: lo bajamos un poco por el menor padding-top */
   right: 28px;
   z-index: 2147483647;
   background: transparent;
@@ -114,23 +114,6 @@ if LOGO_SRC:
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
         unsafe_allow_html=True
     )
-
-st.markdown("""
-<style>
-/* Ocultar las flechitas (control nativo de colapsado del sidebar) */
-[data-testid="stSidebarCollapsedControl"],
-header [data-testid="stSidebarCollapsedControl"],
-[data-testid="stSidebarCollapseButton"] {
-  display: none !important;
-}
-
-/* (Opcional) ocultar también el “resizer” del sidebar */
-[data-testid="stSidebarResizer"] {
-  display: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 
 # ================== SECRETS / PARAMS (DB) ==================
 DB = st.secrets["mysql"]
@@ -167,30 +150,23 @@ def build_pdf_download_url(url: str) -> str | None:
     """Devuelve una URL para descargar PDF si es posible (Drive file, Docs, Sheets, Slides o .pdf)."""
     if not url:
         return None
-    # PDF directo
     if url.lower().split("?")[0].endswith(".pdf"):
         return url
-    # Drive file -> descarga directa
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
         re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
         re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
-    # Google Docs -> export a PDF
     m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    # Google Sheets -> export a PDF
     m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
-        return (
-            "https://docs.google.com/spreadsheets/d/"
-            f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false"
-        )
-    # Google Slides -> export a PDF
+        return ("https://docs.google.com/spreadsheets/d/"
+                f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
     m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m:
         pres_id = m.group(1)
@@ -245,14 +221,14 @@ if st.session_state["nav_hidden"]:
     st.markdown("""
     <style>
     /* Oculta completamente el sidebar y su resizer */
-    [data-testid="stSidebar"], section[data-testid="stSidebar"] {{
+    [data-testid="stSidebar"], section[data-testid="stSidebar"] {
         display: none !important;
-    }}
+    }
     /* Asegura que el contenido principal tome todo el ancho */
-    div[data-testid="stAppViewContainer"] > div.main {{
+    div[data-testid="stAppViewContainer"] > div.main {
         width: 100% !important;
         margin-left: 0 !important;
-    }}
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -277,9 +253,7 @@ else:
     if not items:
         st.warning(f"No se encontraron ítems en {FQN}.")
         st.stop()
-    # Si el usuario nunca abrió el sidebar en esta sesión, por defecto tomamos el primero
     choice = st.session_state.get("last_choice", items[0]["tag"])
-    # Buscar el ítem correspondiente (si no existe, usa el primero)
     selected = next((i for i in items if i["tag"] == choice), items[0])
 
 # Guardar la última selección para restaurarla si se oculta el sidebar
