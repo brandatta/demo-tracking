@@ -115,6 +115,23 @@ if LOGO_SRC:
         unsafe_allow_html=True
     )
 
+st.markdown("""
+<style>
+/* Ocultar las flechitas (control nativo de colapsado del sidebar) */
+[data-testid="stSidebarCollapsedControl"],
+header [data-testid="stSidebarCollapsedControl"],
+[data-testid="stSidebarCollapseButton"] {
+  display: none !important;
+}
+
+/* (Opcional) ocultar también el “resizer” del sidebar */
+[data-testid="stSidebarResizer"] {
+  display: none !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 # ================== SECRETS / PARAMS (DB) ==================
 DB = st.secrets["mysql"]
 SCHEMA  = st.secrets.get("schema", "streamlit_apps")
