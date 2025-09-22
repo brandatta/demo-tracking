@@ -10,10 +10,6 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
-# ---------- STATE: toggle de navegador ----------
-if "nav_hidden" not in st.session_state:
-    st.session_state["nav_hidden"] = False
-
 # ---------- LOGO ----------
 LOGO_HEIGHT_PX = 48  # tamaño del logo
 
@@ -62,11 +58,19 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos base (margen superior reducido) ----
+# ---- Estado del navegador (visible/oculto) ----
+if "nav_visible" not in st.session_state:
+    st.session_state["nav_visible"] = True  # visible por defecto
+
+def toggle_nav():
+    st.session_state["nav_visible"] = not st.session_state["nav_visible"]
+
+# ---- Estilos ----
 st.markdown(f"""
 <style>
+/* Aire arriba para evitar recortes del header */
 .block-container {{
-  padding-top: 0.8rem !important;   /* antes 2.0rem */
+  padding-top: 2.0rem !important;
   padding-bottom: 0.25rem !important;
 }}
 [data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
@@ -74,24 +78,40 @@ header, [data-testid="stHeader"] {{ height: auto !important; overflow: visible !
 
 h1 {{
   font-size: 1.15rem !important;
-  margin-top: 0rem !important;      /* antes 0.2rem */
+  margin-top: 0.2rem !important;
   margin-bottom: 0.6rem !important;
   line-height: 1.25 !important;
   white-space: normal !important;
   overflow-wrap: anywhere;
 }}
+/* Sidebar cuando está visible */
 [data-testid="stSidebar"] {{
   min-width: 300px; width: 300px; border-right: 1px solid #eee;
 }}
+/* Sidebar oculto (se inyecta dinámicamente más abajo si corresponde) */
+
 .info-card {{
   border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
   background: #fafafa; margin-top: 10px;
 }}
 
-/* Logo flotante transparente */
+/* Botón flotante de toggle (arriba a la izquierda del contenido) */
+.nav-toggle {{
+  position: fixed;
+  top: 72px;
+  left: 16px;
+  z-index: 2147483647;
+}}
+.nav-toggle button {{
+  border-radius: 8px !important;
+  padding: 0.4rem 0.75rem !important;
+  font-size: 0.85rem !important;
+}}
+
+/* Logo flotante transparente (arriba derecha) */
 .top-right-logo {{
   position: fixed;
-  top: 64px;              /* antes 72px: lo bajamos un poco por el menor padding-top */
+  top: 72px;
   right: 28px;
   z-index: 2147483647;
   background: transparent;
@@ -100,15 +120,20 @@ h1 {{
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
 }}
-
-/* Botón flotante para el toggle (opcional, visual) */
-.toggle-holder {{
-  position: sticky; top: 0; z-index: 9999; background: transparent;
-  padding-bottom: 6px;
-}}
 </style>
 """, unsafe_allow_html=True)
 
+# CSS para ocultar sidebar cuando corresponde
+if not st.session_state["nav_visible"]:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebar"] { display: none !important; }
+    /* Compensa el espacio que deja el sidebar al ocultarse */
+    [data-testid="stAppViewContainer"] > .main { margin-left: 0 !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Render del logo (clickeable si querés: cambiá href='#' por tu sitio)
 if LOGO_SRC:
     st.markdown(
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
@@ -150,23 +175,30 @@ def build_pdf_download_url(url: str) -> str | None:
     """Devuelve una URL para descargar PDF si es posible (Drive file, Docs, Sheets, Slides o .pdf)."""
     if not url:
         return None
+    # PDF directo
     if url.lower().split("?")[0].endswith(".pdf"):
         return url
+    # Drive file -> descarga directa
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
         re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
         re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
+    # Google Docs -> export a PDF
     m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
+    # Google Sheets -> export a PDF
     m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
-        return ("https://docs.google.com/spreadsheets/d/"
-                f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
+        return (
+            "https://docs.google.com/spreadsheets/d/"
+            f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false"
+        )
+    # Google Slides -> export a PDF
     m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m:
         pres_id = m.group(1)
@@ -208,32 +240,26 @@ def load_nav_items():
 # ================== DATA ==================
 items = load_nav_items()
 
-# ================== TOGGLE EN MAIN (mostrar/ocultar navegador) ==================
-with st.container():
-    st.markdown("<div class='toggle-holder'></div>", unsafe_allow_html=True)
-    col1, col2 = st.columns([0.22, 0.78])
-    with col1:
-        if st.button(("Mostrar navegador" if st.session_state["nav_hidden"] else "Ocultar navegador")):
-            st.session_state["nav_hidden"] = not st.session_state["nav_hidden"]
+# ================== BOTÓN DE TOGGLE (arriba a la izquierda del contenido) ==================
+# Texto dinámico: "Navegador" cuando está visible, "Ampliar" cuando está oculto
+toggle_label = "Navegador" if st.session_state["nav_visible"] else "Ampliar"
+# Usamos un contenedor flotante para posicionar el botón
+toggle_html = f"""
+<div class="nav-toggle">
+    <form action="#" method="get">
+        <button type="submit">{toggle_label}</button>
+    </form>
+</div>
+"""
+# Renderizamos el contenedor del botón
+st.markdown(toggle_html, unsafe_allow_html=True)
+# Y creamos el botón real para manejar el estado (no flota, pero capta el click)
+# Colocamos el botón "fantasma" en el flujo para capturar la interacción:
+if st.button(toggle_label, key="toggle_nav_button"):
+    toggle_nav()
 
-# CSS para ocultar/mostrar el sidebar
-if st.session_state["nav_hidden"]:
-    st.markdown("""
-    <style>
-    /* Oculta completamente el sidebar y su resizer */
-    [data-testid="stSidebar"], section[data-testid="stSidebar"] {
-        display: none !important;
-    }
-    /* Asegura que el contenido principal tome todo el ancho */
-    div[data-testid="stAppViewContainer"] > div.main {
-        width: 100% !important;
-        margin-left: 0 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-# ================== SIDEBAR (NAVEGADOR) ==================
-if not st.session_state["nav_hidden"]:
+# ================== SIDEBAR (solo si visible) ==================
+if st.session_state["nav_visible"]:
     st.sidebar.title("Navegador")
     if not items:
         st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
@@ -245,19 +271,18 @@ if not st.session_state["nav_hidden"]:
 
     # Acciones en el navegador
     st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
+
     pdf_download = build_pdf_download_url(selected["url"])
     if pdf_download:
         st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
 else:
-    # Cuando el navegador está oculto, mantenemos la última selección previa
+    # Si está oculto, necesitamos un fallback para 'selected'
+    # Elegimos el primero por defecto para que el iframe muestre algo.
     if not items:
         st.warning(f"No se encontraron ítems en {FQN}.")
         st.stop()
-    choice = st.session_state.get("last_choice", items[0]["tag"])
-    selected = next((i for i in items if i["tag"] == choice), items[0])
-
-# Guardar la última selección para restaurarla si se oculta el sidebar
-st.session_state["last_choice"] = selected["tag"]
+    choice = items[0]["tag"]
+    selected = items[0]
 
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
@@ -276,7 +301,7 @@ host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
     f"""
     <div class="info-card">
-      <b>Item seleccionado:</b> {selected['tag']}<br>
+      <b>Item seleccionado:</b> {choice}<br>
       <b>URL:</b> <code>{selected['url']}</code><br>
       <b>Host:</b> {host}
     </div>
