@@ -10,6 +10,10 @@ from streamlit.components.v1 import iframe
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
+# ---------- STATE: toggle de navegador ----------
+if "nav_hidden" not in st.session_state:
+    st.session_state["nav_hidden"] = False
+
 # ---------- LOGO ----------
 LOGO_HEIGHT_PX = 48  # tamaño del logo
 
@@ -58,7 +62,7 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estilos ----
+# ---- Estilos base ----
 st.markdown(f"""
 <style>
 .block-container {{
@@ -88,13 +92,19 @@ h1 {{
 .top-right-logo {{
   position: fixed;
   top: 72px;
-  right: 28px;  /* un poco más hacia la izquierda */
+  right: 28px;
   z-index: 2147483647;
   background: transparent;
   padding: 0; border-radius: 0; box-shadow: none;
 }}
 .top-right-logo img {{
   height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
+}}
+
+/* Botón flotante para el toggle (opcional, visual) */
+.toggle-holder {{
+  position: sticky; top: 0; z-index: 9999; background: transparent;
+  padding-bottom: 6px;
 }}
 </style>
 """, unsafe_allow_html=True)
@@ -155,11 +165,10 @@ def build_pdf_download_url(url: str) -> str | None:
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    # Google Sheets -> export a PDF (con params básicos)
+    # Google Sheets -> export a PDF
     m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
-        # Ajustes: una sola hoja, orientación, tamaño… (valores por defecto razonables)
         return (
             "https://docs.google.com/spreadsheets/d/"
             f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false"
@@ -206,22 +215,58 @@ def load_nav_items():
 # ================== DATA ==================
 items = load_nav_items()
 
-# ================== SIDEBAR ==================
-st.sidebar.title("Navegador")
-if not items:
-    st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
-    st.stop()
+# ================== TOGGLE EN MAIN (mostrar/ocultar navegador) ==================
+with st.container():
+    st.markdown("<div class='toggle-holder'></div>", unsafe_allow_html=True)
+    col1, col2 = st.columns([0.22, 0.78])
+    with col1:
+        if st.button(("Mostrar navegador" if st.session_state["nav_hidden"] else "Ocultar navegador")):
+            st.session_state["nav_hidden"] = not st.session_state["nav_hidden"]
 
-choices = [i["tag"] for i in items]
-choice = st.sidebar.selectbox("Enlaces", choices, index=0)
-selected = next(i for i in items if i["tag"] == choice)
+# CSS para ocultar/mostrar el sidebar
+if st.session_state["nav_hidden"]:
+    st.markdown("""
+    <style>
+    /* Oculta completamente el sidebar y su resizer */
+    [data-testid="stSidebar"], section[data-testid="stSidebar"] {{
+        display: none !important;
+    }}
+    /* Asegura que el contenido principal tome todo el ancho */
+    div[data-testid="stAppViewContainer"] > div.main {{
+        width: 100% !important;
+        margin-left: 0 !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
 
-# Acciones en el navegador
-st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
+# ================== SIDEBAR (NAVEGADOR) ==================
+if not st.session_state["nav_hidden"]:
+    st.sidebar.title("Navegador")
+    if not items:
+        st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
+        st.stop()
 
-pdf_download = build_pdf_download_url(selected["url"])
-if pdf_download:
-    st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
+    choices = [i["tag"] for i in items]
+    choice = st.sidebar.selectbox("Enlaces", choices, index=0)
+    selected = next(i for i in items if i["tag"] == choice)
+
+    # Acciones en el navegador
+    st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
+    pdf_download = build_pdf_download_url(selected["url"])
+    if pdf_download:
+        st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
+else:
+    # Cuando el navegador está oculto, mantenemos la última selección previa
+    if not items:
+        st.warning(f"No se encontraron ítems en {FQN}.")
+        st.stop()
+    # Si el usuario nunca abrió el sidebar en esta sesión, por defecto tomamos el primero
+    choice = st.session_state.get("last_choice", items[0]["tag"])
+    # Buscar el ítem correspondiente (si no existe, usa el primero)
+    selected = next((i for i in items if i["tag"] == choice), items[0])
+
+# Guardar la última selección para restaurarla si se oculta el sidebar
+st.session_state["last_choice"] = selected["tag"]
 
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
@@ -240,7 +285,7 @@ host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
     f"""
     <div class="info-card">
-      <b>Item seleccionado:</b> {choice}<br>
+      <b>Item seleccionado:</b> {selected['tag']}<br>
       <b>URL:</b> <code>{selected['url']}</code><br>
       <b>Host:</b> {host}
     </div>
