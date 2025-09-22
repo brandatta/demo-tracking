@@ -87,7 +87,6 @@ h1 {{
 [data-testid="stSidebar"] {{
   min-width: 300px; width: 300px; border-right: 1px solid #eee;
 }}
-/* Ocultar sidebar cuando nav_visible=False (se inyecta dinámicamente más abajo) */
 
 .info-card {{
   border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
@@ -213,8 +212,8 @@ def load_nav_items():
 items = load_nav_items()
 
 # ================== BOTÓN TOGGLE (único) ==================
-toggle_label = "Navegador" if st.session_state["nav_visible"] else "Ampliar"
-# Lo mostramos arriba del contenido
+# CORREGIDO: cuando sidebar visible => "Ampliar"; cuando oculto => "Navegador"
+toggle_label = "Ampliar" if st.session_state["nav_visible"] else "Navegador"
 cols = st.columns([0.2, 0.8, 0.2])
 with cols[0]:
     if st.button(toggle_label, key="toggle_nav_button"):
