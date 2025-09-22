@@ -58,7 +58,7 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estado del navegador (visible/oculto) ----
+# ---- Estado del navegador ----
 if "nav_visible" not in st.session_state:
     st.session_state["nav_visible"] = True  # visible por defecto
 
@@ -68,7 +68,6 @@ def toggle_nav():
 # ---- Estilos ----
 st.markdown(f"""
 <style>
-/* Aire arriba para evitar recortes del header */
 .block-container {{
   padding-top: 2.0rem !important;
   padding-bottom: 0.25rem !important;
@@ -88,27 +87,14 @@ h1 {{
 [data-testid="stSidebar"] {{
   min-width: 300px; width: 300px; border-right: 1px solid #eee;
 }}
-/* Sidebar oculto (se inyecta dinámicamente más abajo si corresponde) */
+/* Ocultar sidebar cuando nav_visible=False (se inyecta dinámicamente más abajo) */
 
 .info-card {{
   border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
   background: #fafafa; margin-top: 10px;
 }}
 
-/* Botón flotante de toggle (arriba a la izquierda del contenido) */
-.nav-toggle {{
-  position: fixed;
-  top: 72px;
-  left: 16px;
-  z-index: 2147483647;
-}}
-.nav-toggle button {{
-  border-radius: 8px !important;
-  padding: 0.4rem 0.75rem !important;
-  font-size: 0.85rem !important;
-}}
-
-/* Logo flotante transparente (arriba derecha) */
+/* Logo flotante transparente */
 .top-right-logo {{
   position: fixed;
   top: 72px;
@@ -123,17 +109,16 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
-# CSS para ocultar sidebar cuando corresponde
+# Ocultar sidebar si corresponde
 if not st.session_state["nav_visible"]:
     st.markdown("""
     <style>
     [data-testid="stSidebar"] { display: none !important; }
-    /* Compensa el espacio que deja el sidebar al ocultarse */
     [data-testid="stAppViewContainer"] > .main { margin-left: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-# Render del logo (clickeable si querés: cambiá href='#' por tu sitio)
+# Render del logo
 if LOGO_SRC:
     st.markdown(
         f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
@@ -150,55 +135,42 @@ FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
 # ================== UTILS (Drive + Docs/Sheets/Slides + PDF) ==================
 def normalize_drive_url(url: str) -> str:
-    """Convierte links de Drive/Docs a URLs embebibles para iframe."""
     if not url:
         return url
-    # Drive file
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
     m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
     m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    # Docs
     m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    # Sheets
     m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    # Slides
     m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
 def build_pdf_download_url(url: str) -> str | None:
-    """Devuelve una URL para descargar PDF si es posible (Drive file, Docs, Sheets, Slides o .pdf)."""
     if not url:
         return None
-    # PDF directo
     if url.lower().split("?")[0].endswith(".pdf"):
         return url
-    # Drive file -> descarga directa
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
         re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
         re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
-    # Google Docs -> export a PDF
     m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    # Google Sheets -> export a PDF
     m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
-        return (
-            "https://docs.google.com/spreadsheets/d/"
-            f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false"
-        )
-    # Google Slides -> export a PDF
+        return ("https://docs.google.com/spreadsheets/d/"
+                f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
     m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m:
         pres_id = m.group(1)
@@ -240,44 +212,28 @@ def load_nav_items():
 # ================== DATA ==================
 items = load_nav_items()
 
-# ================== BOTÓN DE TOGGLE (arriba a la izquierda del contenido) ==================
-# Texto dinámico: "Navegador" cuando está visible, "Ampliar" cuando está oculto
+# ================== BOTÓN TOGGLE (único) ==================
 toggle_label = "Navegador" if st.session_state["nav_visible"] else "Ampliar"
-# Usamos un contenedor flotante para posicionar el botón
-toggle_html = f"""
-<div class="nav-toggle">
-    <form action="#" method="get">
-        <button type="submit">{toggle_label}</button>
-    </form>
-</div>
-"""
-# Renderizamos el contenedor del botón
-st.markdown(toggle_html, unsafe_allow_html=True)
-# Y creamos el botón real para manejar el estado (no flota, pero capta el click)
-# Colocamos el botón "fantasma" en el flujo para capturar la interacción:
-if st.button(toggle_label, key="toggle_nav_button"):
-    toggle_nav()
+# Lo mostramos arriba del contenido
+cols = st.columns([0.2, 0.8, 0.2])
+with cols[0]:
+    if st.button(toggle_label, key="toggle_nav_button"):
+        toggle_nav()
 
-# ================== SIDEBAR (solo si visible) ==================
+# ================== SIDEBAR ==================
 if st.session_state["nav_visible"]:
     st.sidebar.title("Navegador")
     if not items:
         st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
         st.stop()
-
     choices = [i["tag"] for i in items]
     choice = st.sidebar.selectbox("Enlaces", choices, index=0)
     selected = next(i for i in items if i["tag"] == choice)
-
-    # Acciones en el navegador
     st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
-
     pdf_download = build_pdf_download_url(selected["url"])
     if pdf_download:
         st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
 else:
-    # Si está oculto, necesitamos un fallback para 'selected'
-    # Elegimos el primero por defecto para que el iframe muestre algo.
     if not items:
         st.warning(f"No se encontraron ítems en {FQN}.")
         st.stop()
@@ -287,7 +243,6 @@ else:
 # ================== MAIN ==================
 st.title("Demo de Producto — Tracking")
 
-# Iframe fijo a 900 px
 embed_url = normalize_drive_url(selected["url"])
 try:
     iframe(src=embed_url, height=900, scrolling=True)
@@ -295,7 +250,6 @@ try:
 except Exception:
     st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
 
-# Tarjeta de info (debajo del iframe)
 parsed = urlparse(selected["url"])
 host = (parsed.netloc or parsed.path).split('/')[0]
 st.markdown(
