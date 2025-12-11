@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
 
 # ---------- LOGO ----------
-LOGO_HEIGHT_PX = 48  # tamaño del logo
+LOGO_HEIGHT_PX = 48
 
 def _read_file_as_data_uri(p: Path) -> str | None:
     if not p.exists() or not p.is_file():
@@ -35,19 +35,17 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
         script_dir = Path(__file__).parent.resolve()
     except NameError:
         script_dir = Path.cwd().resolve()
+
     parent_dir = script_dir.parent
     cwd_dir = Path.cwd().resolve()
 
     candidates = [
-        script_dir / "logo.png", script_dir / "logo.svg", script_dir / "logo.jpg", script_dir / "logo.jpeg",
+        script_dir / "logo.png", script_dir / "logo.svg",
+        parent_dir / "logo.png", parent_dir / "logo.svg",
+        cwd_dir / "logo.png", cwd_dir / "logo.svg",
         script_dir / "assets" / "logo.png", script_dir / "assets" / "logo.svg",
-        script_dir / "assets" / "logo.jpg", script_dir / "assets" / "logo.jpeg",
-        parent_dir / "logo.png", parent_dir / "logo.svg", parent_dir / "logo.jpg", parent_dir / "logo.jpeg",
         parent_dir / "assets" / "logo.png", parent_dir / "assets" / "logo.svg",
-        parent_dir / "assets" / "logo.jpg", parent_dir / "assets" / "logo.jpeg",
-        cwd_dir / "logo.png", cwd_dir / "logo.svg", cwd_dir / "logo.jpg", cwd_dir / "logo.jpeg",
         cwd_dir / "assets" / "logo.png", cwd_dir / "assets" / "logo.svg",
-        cwd_dir / "assets" / "logo.jpg", cwd_dir / "assets" / "logo.jpeg",
     ]
     for p in candidates:
         if p.exists():
@@ -59,13 +57,6 @@ def resolve_logo_src() -> tuple[str | None, list[str]]:
 
 LOGO_SRC, _ = resolve_logo_src()
 
-# ---- Estado del navegador ----
-if "nav_visible" not in st.session_state:
-    st.session_state["nav_visible"] = True  # visible por defecto
-
-def toggle_nav():
-    st.session_state["nav_visible"] = not st.session_state["nav_visible"]
-
 # ---- Estilos base ----
 st.markdown(f"""
 <style>
@@ -73,79 +64,33 @@ st.markdown(f"""
   padding-top: 2.0rem !important;
   padding-bottom: 0.25rem !important;
 }}
-[data-testid="stAppViewContainer"] > .main {{ overflow: visible !important; }}
-header, [data-testid="stHeader"] {{ height: auto !important; overflow: visible !important; }}
 
-h1 {{
-  font-size: 1.15rem !important;
-  margin-top: 0.2rem !important;
-  margin-bottom: 0.6rem !important;
-  line-height: 1.25 !important;
-  white-space: normal !important;
-  overflow-wrap: anywhere;
-}}
-
-/* Sidebar: solo definimos borde; ancho lo manejamos dinámicamente */
-[data-testid="stSidebar"] {{
-  border-right: 1px solid #eee;
-}}
-
-.info-card {{
-  border: 1px solid #e9e9e9; border-radius: 12px; padding: 10px 12px;
-  background: #fafafa; margin-top: 10px;
-}}
-
-/* Logo flotante transparente */
 .top-right-logo {{
   position: fixed;
   top: 72px;
   right: 28px;
-  z-index: 2147483647;
-  background: transparent;
-  padding: 0; border-radius: 0; box-shadow: none;
+  z-index: 999999;
 }}
+
 .top-right-logo img {{
-  height: {LOGO_HEIGHT_PX}px; width: auto; display: block;
+  height: {LOGO_HEIGHT_PX}px;
+  width: auto;
+}}
+
+.info-card {{
+  border: 1px solid #e9e9e9;
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fafafa;
+  margin-top: 10px;
 }}
 </style>
 """, unsafe_allow_html=True)
 
-# Mostrar / ocultar sidebar según el estado (sin tocar display, solo visibility + width)
-if st.session_state["nav_visible"]:
-    sidebar_css = """
-    <style>
-    [data-testid="stSidebar"] { 
-        visibility: visible !important;
-        opacity: 1 !important;
-        width: 300px !important;
-        min-width: 300px !important;
-    }
-    [data-testid="stAppViewContainer"] > .main {
-        margin-left: 0 !important;
-    }
-    </style>
-    """
-else:
-    sidebar_css = """
-    <style>
-    [data-testid="stSidebar"] { 
-        visibility: hidden !important;
-        opacity: 0 !important;
-        width: 0 !important;
-        min-width: 0 !important;
-    }
-    [data-testid="stAppViewContainer"] > .main {
-        margin-left: 0 !important;
-    }
-    </style>
-    """
-
-st.markdown(sidebar_css, unsafe_allow_html=True)
-
-# Render del logo
+# Logo
 if LOGO_SRC:
     st.markdown(
-        f"<div class='top-right-logo'><a href='#' target='_blank'><img src='{LOGO_SRC}' alt='Logo'></a></div>",
+        f"<div class='top-right-logo'><img src='{LOGO_SRC}'></div>",
         unsafe_allow_html=True
     )
 
@@ -155,52 +100,17 @@ SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
-HTML_COL = st.secrets.get("html_col", "html_top")  # nombre lógico de la columna para HTML "arriba"
+HTML_COL = st.secrets.get("html_col", "html_top")
 FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
-# ================== UTILS (Drive + Docs/Sheets/Slides + PDF) ==================
+# ================== UTILS ==================
 def normalize_drive_url(url: str) -> str:
     if not url:
         return url
     m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
-    if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
-    if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
-    if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
-    if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
-    if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
-    if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
+    if m:
+        return f"https://drive.google.com/file/d/{m.group(1)}/preview"
     return url
-
-def build_pdf_download_url(url: str) -> str | None:
-    if not url:
-        return None
-    if url.lower().split("?")[0].endswith(".pdf"):
-        return url
-    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
-        re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
-        re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
-    if m:
-        file_id = m.group(1)
-        return f"https://drive.google.com/uc?export=download&id={file_id}"
-    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
-    if m:
-        doc_id = m.group(1)
-        return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
-    if m:
-        sheet_id = m.group(1)
-        return ("https://docs.google.com/spreadsheets/d/"
-                f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
-    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
-    if m:
-        pres_id = m.group(1)
-        return f"https://docs.google.com/presentation/d/{pres_id}/export/pdf"
-    return None
 
 # ================== DB ==================
 def get_connection():
@@ -220,41 +130,32 @@ def load_nav_items():
     try:
         conn = get_connection()
         cur = conn.cursor()
+
+        # Intento 1: traer html_top
         try:
-            # Intento 1: traer también la columna HTML_COL
             cur.execute(
                 f"SELECT `{TAG_COL}`, `{URL_COL}`, `{HTML_COL}` "
                 f"FROM {FQN} ORDER BY `{TAG_COL}`"
             )
             for tag, url, html_top in cur.fetchall():
-                if tag and url:
-                    rows.append({
-                        "tag": str(tag),
-                        "url": str(url),
-                        "html_top": str(html_top) if html_top else ""
-                    })
-        except Error as e:
-            # Si la columna no existe, hacemos fallback a solo tag + url
-            if "Unknown column" in str(e):
-                try:
-                    if cur:
-                        cur.close()
-                except:
-                    pass
-                cur = conn.cursor()
-                cur.execute(
-                    f"SELECT `{TAG_COL}`, `{URL_COL}` "
-                    f"FROM {FQN} ORDER BY `{TAG_COL}`"
-                )
-                for tag, url in cur.fetchall():
-                    if tag and url:
-                        rows.append({
-                            "tag": str(tag),
-                            "url": str(url),
-                            "html_top": ""  # sin HTML arriba
-                        })
-            else:
-                raise
+                rows.append({
+                    "tag": tag,
+                    "url": url,
+                    "html_top": html_top or ""
+                })
+        except:
+            # Fallback: si no existe html_top
+            cur = conn.cursor()
+            cur.execute(
+                f"SELECT `{TAG_COL}`, `{URL_COL}` FROM {FQN} ORDER BY `{TAG_COL}`"
+            )
+            for tag, url in cur.fetchall():
+                rows.append({
+                    "tag": tag,
+                    "url": url,
+                    "html_top": ""
+                })
+
     except Error as e:
         st.error(f"Error al leer {FQN}: {e}")
     finally:
@@ -265,78 +166,51 @@ def load_nav_items():
             pass
     return rows
 
-# ================== DATA ==================
 items = load_nav_items()
 
-# ================== BOTÓN TOGGLE (único) ==================
-toggle_label = "Ampliar" if st.session_state["nav_visible"] else "Navegador"
-cols = st.columns([0.2, 0.8, 0.2])
-with cols[0]:
-    if st.button(toggle_label, key="toggle_nav_button"):
-        toggle_nav()
+# ================== SIDEBAR (siempre visible) ==================
+st.sidebar.title("Navegador")
 
-# ================== SIDEBAR ==================
-if st.session_state["nav_visible"]:
-    st.sidebar.title("Navegador")
-    if not items:
-        st.sidebar.warning(f"No se encontraron ítems en {FQN}.")
-        st.stop()
-    choices = [i["tag"] for i in items]
-    choice = st.sidebar.selectbox("Enlaces", choices, index=0)
-    selected = next(i for i in items if i["tag"] == choice)
-    st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
-    pdf_download = build_pdf_download_url(selected["url"])
-    if pdf_download:
-        st.sidebar.markdown(f"[Descargar PDF]({pdf_download})")
-else:
-    if not items:
-        st.warning(f"No se encontraron ítems en {FQN}.")
-        st.stop()
-    choice = items[0]["tag"]
-    selected = items[0]
+if not items:
+    st.sidebar.warning("No se encontraron items.")
+    st.stop()
+
+choices = [i["tag"] for i in items]
+choice = st.sidebar.selectbox("Enlaces", choices, index=0)
+selected = next(i for i in items if i["tag"] == choice)
+
+st.sidebar.markdown(f"[Abrir {choice} en nueva pestaña]({selected['url']})")
 
 # ================== MAIN ==================
 
-# Bloque HTML "Arriba" asociado a la app seleccionada
+# Bloque HTML ARRIBA (si existe)
 top_html = selected.get("html_top", "").strip()
 
 if top_html:
     st.subheader("Vista general")
-    # Si parece una URL externa (http/https), usamos iframe
     if top_html.startswith("http://") or top_html.startswith("https://"):
         iframe(src=top_html, height=260, scrolling=False)
     else:
-        # Lo tratamos como archivo local
         html_path = Path(top_html)
         if not html_path.is_absolute():
-            # relativo al directorio del script
-            try:
-                script_dir = Path(__file__).parent.resolve()
-            except NameError:
-                script_dir = Path.cwd().resolve()
+            script_dir = Path(__file__).parent.resolve()
             html_path = script_dir / html_path
 
         if html_path.exists():
-            try:
-                html_content = html_path.read_text(encoding="utf-8")
-                components.html(html_content, height=260, scrolling=False)
-            except Exception as e:
-                st.warning(f"No se pudo renderizar el HTML superior: {e}")
+            components.html(html_path.read_text(), height=260, scrolling=False)
         else:
-            st.warning(f"No se encontró el archivo HTML superior: {html_path}")
+            st.warning(f"No se encontró el HTML superior: {html_path}")
 
-# Título + iframe principal
+# CONTENIDO PRINCIPAL
 st.title("Demo de Producto — Tracking")
 
 embed_url = normalize_drive_url(selected["url"])
-try:
-    iframe(src=embed_url, height=900, scrolling=True)
-    st.caption("Si no se ve, el sitio puede bloquear el embebido (X-Frame-Options/CSP).")
-except Exception:
-    st.warning("No se pudo embeber el contenido. Abrilo en nueva pestaña.")
+
+iframe(src=embed_url, height=900, scrolling=True)
 
 parsed = urlparse(selected["url"])
-host = (parsed.netloc or parsed.path).split('/')[0]
+host = parsed.netloc or parsed.path
+
 st.markdown(
     f"""
     <div class="info-card">
