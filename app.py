@@ -66,7 +66,7 @@ if "nav_visible" not in st.session_state:
 def toggle_nav():
     st.session_state["nav_visible"] = not st.session_state["nav_visible"]
 
-# ---- Estilos ----
+# ---- Estilos base ----
 st.markdown(f"""
 <style>
 .block-container {{
@@ -84,9 +84,9 @@ h1 {{
   white-space: normal !important;
   overflow-wrap: anywhere;
 }}
-/* Sidebar cuando está visible */
+/* Sidebar cuando está visible (ancho) */
 [data-testid="stSidebar"] {{
-  min-width: 300px; width: 300px; border-right: 1px solid #eee;
+  border-right: 1px solid #eee;
 }}
 
 .info-card {{
@@ -109,14 +109,37 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
-# Ocultar sidebar si corresponde
-if not st.session_state["nav_visible"]:
-    st.markdown("""
+# Mostrar / ocultar sidebar según el estado (sobrescribe estilos previos)
+if st.session_state["nav_visible"]:
+    sidebar_css = """
     <style>
-    [data-testid="stSidebar"] { display: none !important; }
-    [data-testid="stAppViewContainer"] > .main { margin-left: 0 !important; }
+    [data-testid="stSidebar"] { 
+        display: block !important;
+        visibility: visible !important;
+        width: 300px !important;
+        min-width: 300px !important;
+    }
+    [data-testid="stAppViewContainer"] > .main {
+        margin-left: 0 !important;
+    }
     </style>
-    """, unsafe_allow_html=True)
+    """
+else:
+    sidebar_css = """
+    <style>
+    [data-testid="stSidebar"] { 
+        display: none !important;
+        visibility: hidden !important;
+        width: 0 !important;
+        min-width: 0 !important;
+    }
+    [data-testid="stAppViewContainer"] > .main {
+        margin-left: 0 !important;
+    }
+    </style>
+    """
+
+st.markdown(sidebar_css, unsafe_allow_html=True)
 
 # Render del logo
 if LOGO_SRC:
@@ -138,17 +161,17 @@ FQN     = f"`{SCHEMA}`.`{TABLE}`"
 def normalize_drive_url(url: str) -> str:
     if not url:
         return url
-    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
+    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
@@ -157,22 +180,22 @@ def build_pdf_download_url(url: str) -> str | None:
         return None
     if url.lower().split("?")[0].endswith(".pdf"):
         return url
-    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url) or \
-        re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url) or \
-        re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
+        re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
+        re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
-    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
         return ("https://docs.google.com/spreadsheets/d/"
                 f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
-    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
+    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
     if m:
         pres_id = m.group(1)
         return f"https://docs.google.com/presentation/d/{pres_id}/export/pdf"
