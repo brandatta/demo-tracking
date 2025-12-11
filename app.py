@@ -84,7 +84,8 @@ h1 {{
   white-space: normal !important;
   overflow-wrap: anywhere;
 }}
-/* Sidebar cuando está visible (ancho) */
+
+/* Sidebar: solo definimos borde; ancho lo manejamos dinámicamente */
 [data-testid="stSidebar"] {{
   border-right: 1px solid #eee;
 }}
@@ -109,13 +110,13 @@ h1 {{
 </style>
 """, unsafe_allow_html=True)
 
-# Mostrar / ocultar sidebar según el estado (sobrescribe estilos previos)
+# Mostrar / ocultar sidebar según el estado (sin tocar display, solo visibility + width)
 if st.session_state["nav_visible"]:
     sidebar_css = """
     <style>
     [data-testid="stSidebar"] { 
-        display: block !important;
         visibility: visible !important;
+        opacity: 1 !important;
         width: 300px !important;
         min-width: 300px !important;
     }
@@ -128,8 +129,8 @@ else:
     sidebar_css = """
     <style>
     [data-testid="stSidebar"] { 
-        display: none !important;
         visibility: hidden !important;
+        opacity: 0 !important;
         width: 0 !important;
         min-width: 0 !important;
     }
