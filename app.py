@@ -6,6 +6,7 @@ import mysql.connector
 from mysql.connector import Error
 from urllib.parse import urlparse
 from streamlit.components.v1 import iframe
+import streamlit.components.v1 as components
 
 # ================== CONFIG / UI ==================
 st.set_page_config(page_title="Demo Tracking - Navegador MySQL", layout="wide")
@@ -130,6 +131,7 @@ SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
+HTML_COL = st.secrets.get("html_col", "html_top")  # NUEVO: columna con el html "arriba"
 FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
 # ================== UTILS (Drive + Docs/Sheets/Slides + PDF) ==================
@@ -194,10 +196,18 @@ def load_nav_items():
     try:
         conn = get_connection()
         cur = conn.cursor()
-        cur.execute(f"SELECT `{TAG_COL}`, `{URL_COL}` FROM {FQN} ORDER BY `{TAG_COL}`")
-        for tag, url in cur.fetchall():
+        # Traemos tag, url y html_top
+        cur.execute(
+            f"SELECT `{TAG_COL}`, `{URL_COL}`, `{HTML_COL}` "
+            f"FROM {FQN} ORDER BY `{TAG_COL}`"
+        )
+        for tag, url, html_top in cur.fetchall():
             if tag and url:
-                rows.append({"tag": str(tag), "url": str(url)})
+                rows.append({
+                    "tag": str(tag),
+                    "url": str(url),
+                    "html_top": str(html_top) if html_top else ""
+                })
     except Error as e:
         st.error(f"Error al leer {FQN}: {e}")
     finally:
@@ -212,7 +222,7 @@ def load_nav_items():
 items = load_nav_items()
 
 # ================== BOTÓN TOGGLE (único) ==================
-# CORREGIDO: cuando sidebar visible => "Ampliar"; cuando oculto => "Navegador"
+# Cuando sidebar visible => "Ampliar"; cuando oculto => "Navegador"
 toggle_label = "Ampliar" if st.session_state["nav_visible"] else "Navegador"
 cols = st.columns([0.2, 0.8, 0.2])
 with cols[0]:
@@ -240,6 +250,36 @@ else:
     selected = items[0]
 
 # ================== MAIN ==================
+
+# Bloque HTML "Arriba" asociado a la app seleccionada
+top_html = selected.get("html_top", "").strip()
+
+if top_html:
+    st.subheader("Vista general")
+    # Si parece una URL externa (http/https), usamos iframe
+    if top_html.startswith("http://") or top_html.startswith("https://"):
+        iframe(src=top_html, height=260, scrolling=False)
+    else:
+        # Lo tratamos como archivo local
+        html_path = Path(top_html)
+        if not html_path.is_absolute():
+            # relativo al directorio del script
+            try:
+                script_dir = Path(__file__).parent.resolve()
+            except NameError:
+                script_dir = Path.cwd().resolve()
+            html_path = script_dir / html_path
+
+        if html_path.exists():
+            try:
+                html_content = html_path.read_text(encoding="utf-8")
+                components.html(html_content, height=260, scrolling=False)
+            except Exception as e:
+                st.warning(f"No se pudo renderizar el HTML superior: {e}")
+        else:
+            st.warning(f"No se encontró el archivo HTML superior: {html_path}")
+
+# Título + iframe principal
 st.title("Demo de Producto — Tracking")
 
 embed_url = normalize_drive_url(selected["url"])
@@ -261,3 +301,4 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
