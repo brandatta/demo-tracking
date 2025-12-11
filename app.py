@@ -131,24 +131,24 @@ SCHEMA  = st.secrets.get("schema", "streamlit_apps")
 TABLE   = st.secrets.get("table", "links_demos")
 TAG_COL = st.secrets.get("tag_col", "tag")
 URL_COL = st.secrets.get("url_col", "links")
-HTML_COL = st.secrets.get("html_col", "html_top")  # NUEVO: columna con el html "arriba"
+HTML_COL = st.secrets.get("html_col", "html_top")  # nombre lógico de la columna para HTML "arriba"
 FQN     = f"`{SCHEMA}`.`{TABLE}`"
 
 # ================== UTILS (Drive + Docs/Sheets/Slides + PDF) ==================
 def normalize_drive_url(url: str) -> str:
     if not url:
         return url
-    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url)
+    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
     if m: return f"https://drive.google.com/file/d/{m.group(1)}/preview"
-    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/document/d/{m.group(1)}/pub?embedded=true"
-    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/pubhtml?widget=true&headers=false"
-    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
     if m: return f"https://docs.google.com/presentation/d/{m.group(1)}/embed?start=false&loop=false"
     return url
 
@@ -157,22 +157,22 @@ def build_pdf_download_url(url: str) -> str | None:
         return None
     if url.lower().split("?")[0].endswith(".pdf"):
         return url
-    m = re.search(r"https://drive\.google\.com/file/d/([^/]+)/", url) or \
-        re.search(r"https://drive\.google\.com/open\?id=([^&]+)", url) or \
-        re.search(r"https://drive\.google\.com/uc\?(?:export=download&)?id=([^&]+)", url)
+    m = re.search(r"https://drive\\.google\\.com/file/d/([^/]+)/", url) or \
+        re.search(r"https://drive\\.google\\.com/open\\?id=([^&]+)", url) or \
+        re.search(r"https://drive\\.google\\.com/uc\\?(?:export=download&)?id=([^&]+)", url)
     if m:
         file_id = m.group(1)
         return f"https://drive.google.com/uc?export=download&id={file_id}"
-    m = re.search(r"https://docs\.google\.com/document/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/document/d/([^/]+)/", url)
     if m:
         doc_id = m.group(1)
         return f"https://docs.google.com/document/d/{doc_id}/export?format=pdf"
-    m = re.search(r"https://docs\.google\.com/spreadsheets/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/spreadsheets/d/([^/]+)/", url)
     if m:
         sheet_id = m.group(1)
         return ("https://docs.google.com/spreadsheets/d/"
                 f"{sheet_id}/export?format=pdf&portrait=false&size=letter&sheetnames=false")
-    m = re.search(r"https://docs\.google\.com/presentation/d/([^/]+)/", url)
+    m = re.search(r"https://docs\\.google\\.com/presentation/d/([^/]+)/", url)
     if m:
         pres_id = m.group(1)
         return f"https://docs.google.com/presentation/d/{pres_id}/export/pdf"
@@ -196,18 +196,41 @@ def load_nav_items():
     try:
         conn = get_connection()
         cur = conn.cursor()
-        # Traemos tag, url y html_top
-        cur.execute(
-            f"SELECT `{TAG_COL}`, `{URL_COL}`, `{HTML_COL}` "
-            f"FROM {FQN} ORDER BY `{TAG_COL}`"
-        )
-        for tag, url, html_top in cur.fetchall():
-            if tag and url:
-                rows.append({
-                    "tag": str(tag),
-                    "url": str(url),
-                    "html_top": str(html_top) if html_top else ""
-                })
+        try:
+            # Intento 1: traer también la columna HTML_COL
+            cur.execute(
+                f"SELECT `{TAG_COL}`, `{URL_COL}`, `{HTML_COL}` "
+                f"FROM {FQN} ORDER BY `{TAG_COL}`"
+            )
+            for tag, url, html_top in cur.fetchall():
+                if tag and url:
+                    rows.append({
+                        "tag": str(tag),
+                        "url": str(url),
+                        "html_top": str(html_top) if html_top else ""
+                    })
+        except Error as e:
+            # Si la columna no existe, hacemos fallback a solo tag + url
+            if "Unknown column" in str(e):
+                try:
+                    if cur:
+                        cur.close()
+                except:
+                    pass
+                cur = conn.cursor()
+                cur.execute(
+                    f"SELECT `{TAG_COL}`, `{URL_COL}` "
+                    f"FROM {FQN} ORDER BY `{TAG_COL}`"
+                )
+                for tag, url in cur.fetchall():
+                    if tag and url:
+                        rows.append({
+                            "tag": str(tag),
+                            "url": str(url),
+                            "html_top": ""  # sin HTML arriba
+                        })
+            else:
+                raise
     except Error as e:
         st.error(f"Error al leer {FQN}: {e}")
     finally:
@@ -222,7 +245,6 @@ def load_nav_items():
 items = load_nav_items()
 
 # ================== BOTÓN TOGGLE (único) ==================
-# Cuando sidebar visible => "Ampliar"; cuando oculto => "Navegador"
 toggle_label = "Ampliar" if st.session_state["nav_visible"] else "Navegador"
 cols = st.columns([0.2, 0.8, 0.2])
 with cols[0]:
@@ -301,4 +323,3 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
